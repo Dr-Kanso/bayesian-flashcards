@@ -4,7 +4,7 @@ import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 import './App.css';
 
-const API_BASE = "http://localhost:5002";
+const API_BASE = "http://localhost:5002"; // This matches your backend
 const API = `${API_BASE}/api`;  // Updated port from 5001 to 5002
 const DEFAULT_USER = "default";
 
@@ -153,6 +153,46 @@ const ImageDropZone = ({ onDrop, image, onRemove, side }) => {
   );
 };
 
+// Custom PromptModal component
+const PromptModal = ({ isOpen, onClose, onSubmit, title, placeholder, defaultValue = '' }) => {
+  const [inputValue, setInputValue] = useState(defaultValue);
+  const [error, setError] = useState('');
+  
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit(inputValue);
+  };
+  
+  const handleCancel = () => {
+    onClose();
+    onSubmit(null);
+  };
+  
+  if (!isOpen) return null;
+  
+  return (
+    <div className="modal-overlay" onClick={handleCancel}>
+      <div className="modal-content prompt-modal" onClick={e => e.stopPropagation()}>
+        <h2>{title}</h2>
+        <form onSubmit={handleSubmit}>
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder={placeholder}
+            className="prompt-input"
+            autoFocus
+          />
+          <div className="modal-buttons">
+            <button type="button" onClick={handleCancel} className="cancel-button">Cancel</button>
+            <button type="submit" className="submit-button">OK</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 function App() {
   const [decks, setDecks] = useState([]);
   const [currentDeck, setCurrentDeck] = useState(null);
@@ -169,6 +209,9 @@ function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState(null);
   const [showCreateDeckModal, setShowCreateDeckModal] = useState(false);
+  const [showPromptModal, setShowPromptModal] = useState(false);
+  const [promptConfig, setPromptConfig] = useState({});
+  const [promptResolve, setPromptResolve] = useState(null);
 
   const [timer, setTimer] = useState(60); // 1 minute default
   const [isTimerRunning, setIsTimerRunning] = useState(false);
@@ -277,10 +320,31 @@ useEffect(() => {
     }
   }, [view]);
 
+  // Custom prompt function
+  const showPromptDialog = (title, placeholder = '', defaultValue = '') => {
+    return new Promise((resolve) => {
+      setPromptConfig({ title, placeholder, defaultValue });
+      setPromptResolve(() => resolve);
+      setShowPromptModal(true);
+    });
+  };
+
+  const handlePromptSubmit = (value) => {
+    setShowPromptModal(false);
+    if (promptResolve) {
+      promptResolve(value);
+      setPromptResolve(null);
+    }
+  };
+
   // Session management functions
   const startStudySession = async () => {
     try {
-      const sessionName = prompt("Enter a name for this study session (or leave blank for default):");
+      const sessionName = await showPromptDialog(
+        "Enter a name for this study session",
+        "Enter session name (or leave blank for default)",
+        ""
+      );
       
       // If user clicks cancel (sessionName is null), return to decks view
       if (sessionName === null) {
@@ -1304,6 +1368,16 @@ useEffect(() => {
           }}
         />
       )}
+
+      {/* Custom prompt modal */}
+      <PromptModal
+        isOpen={showPromptModal}
+        onClose={() => setShowPromptModal(false)}
+        onSubmit={handlePromptSubmit}
+        title={promptConfig.title}
+        placeholder={promptConfig.placeholder}
+        defaultValue={promptConfig.defaultValue}
+      />
 
       <FooterMasthead />
     </div>
